@@ -41,6 +41,10 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 				d.printReflect(w, reflectValue.Elem())
 			}
 		}
+	case reflect.Invalid:
+		fmt.Fprintf(w, "<INVALID>")		
+	case reflect.Interface:
+		d.printReflect(w, reflectValue.Elem())
 	case reflect.Struct:
 		fmt.Fprintf(w, "%s{", reflectValue.Type().Name())
 		for i := 0; i < reflectValue.NumField(); i++ {
@@ -75,6 +79,6 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 		}
 		fmt.Fprint(w, "}")
 	default:
-		fmt.Fprintf(w, "%s(???)", reflectValue.Kind().String())
+		fmt.Fprintf(w, "%s(<???>)", reflectValue.Kind().String())
 	}
 }

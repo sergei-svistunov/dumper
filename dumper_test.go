@@ -63,6 +63,17 @@ func TestDumpPtr(t *testing.T) {
 	check(t, &intVarPtr, "&(0xADDR)&(0xADDR)int(123)", "Ptr to ptr to int")
 }
 
+func TestDumpInterface(t *testing.T) {
+	var interfaceVar interface{}
+
+	check(t, interfaceVar, "<INVALID>", "Empty interface")
+	check(t, &interfaceVar, "&(0xADDR)<INVALID>", "Ptr to empty interface")
+
+	interfaceVar = int(123)
+	check(t, interfaceVar, "int(123)", "Int in interface")
+	check(t, &interfaceVar, "&(0xADDR)int(123)", "Ptr to Int in interface")
+}
+
 func TestDumpStruct(t *testing.T) {
 	s := testStruct{
 		f1: 1,
