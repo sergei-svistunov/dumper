@@ -4,12 +4,20 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"bytes"
 )
 
 func Dump(w io.Writer, variable interface{}) {
 	(&dumper{
 		ptrs: make(map[uintptr]bool),
 	}).printReflect(w, reflect.ValueOf(variable))
+}
+
+// DumpToString dumps interface to string.
+func DumpToString(i interface{}) string {
+	buf := new(bytes.Buffer)
+	Dump(buf, i)
+	return buf.String()
 }
 
 type dumper struct {
