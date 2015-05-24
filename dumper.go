@@ -1,10 +1,10 @@
 package dumper
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"reflect"
-	"bytes"
 )
 
 func Dump(w io.Writer, variable interface{}) {
@@ -31,7 +31,7 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		fmt.Fprintf(w, "%s(%d)", reflectValue.Type().Name(), reflectValue.Uint())
 	case reflect.Bool:
-		fmt.Fprintf(w, "%t", reflectValue.Bool())
+		fmt.Fprintf(w, "%s(%t)", reflectValue.Type().Name(), reflectValue.Bool())
 	case reflect.String:
 		fmt.Fprintf(w, "%s(%q)", reflectValue.Type().Name(), reflectValue.String())
 	case reflect.Float32, reflect.Float64:
@@ -50,7 +50,7 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 			}
 		}
 	case reflect.Invalid:
-		fmt.Fprintf(w, "<INVALID>")		
+		fmt.Fprintf(w, "<INVALID>")
 	case reflect.Interface:
 		d.printReflect(w, reflectValue.Elem())
 	case reflect.Struct:
