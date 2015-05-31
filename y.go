@@ -2,13 +2,14 @@
 package dumper
 
 import (
+	"bytes"
 	"errors"
 	__yyfmt__ "fmt"
 	"regexp"
 	"unicode/utf8"
 )
 
-//line dumper.y:12
+//line dumper.y:13
 type yySymType struct {
 	yys       int
 	string    string
@@ -23,20 +24,26 @@ type yySymType struct {
 const STRING = 57346
 const NUMBER = 57347
 const PTR = 57348
-const NIL = 57349
-const BOOL = 57350
-const MAP = 57351
-const INVALID = 57352
-const IDENTIFIER = 57353
+const HINTARRAY = 57349
+const HINTMAP = 57350
+const NIL = 57351
+const BOOL = 57352
+const MAP = 57353
+const INVALID = 57354
+const INTERFACE = 57355
+const IDENTIFIER = 57356
 
 var yyToknames = []string{
 	"STRING",
 	"NUMBER",
 	"PTR",
+	"HINTARRAY",
+	"HINTMAP",
 	"NIL",
 	"BOOL",
 	"MAP",
 	"INVALID",
+	"INTERFACE",
 	"IDENTIFIER",
 }
 var yyStatenames = []string{}
@@ -45,7 +52,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyMaxDepth = 200
 
-//line dumper.y:230
+//line dumper.y:263
 
 type exprLex struct {
 	line   []byte
@@ -54,58 +61,57 @@ type exprLex struct {
 	err    error
 }
 
-func strPtr(s string) *string { return &s }
-
-var stringRe, numberRe, ptrRe, nilRe, boolRe, mapRe, invalidRe, identifierRe *regexp.Regexp
-
-func init() {
-	var err error
-
-	stringRe, err = regexp.Compile(`^(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")`)
-	if err != nil {
-		panic(err)
-	}
-
-	numberRe, err = regexp.Compile(`^-?\d+(?:[.,]\d+)?`)
-	if err != nil {
-		panic(err)
-	}
-
-	ptrRe, err = regexp.Compile(`^0x[0-9a-f]+`)
-	if err != nil {
-		panic(err)
-	}
-
-	nilRe, err = regexp.Compile(`^\(nil\)`)
-	if err != nil {
-		panic(err)
-	}
-
-	nilRe, err = regexp.Compile(`^\(nil\)`)
-	if err != nil {
-		panic(err)
-	}
-
-	boolRe, err = regexp.Compile(`^(?:true|false)`)
-	if err != nil {
-		panic(err)
-	}
-
-	mapRe, err = regexp.Compile(`^map`)
-	if err != nil {
-		panic(err)
-	}
-
-	invalidRe, err = regexp.Compile(`^<INVALID>`)
-	if err != nil {
-		panic(err)
-	}
-
-	identifierRe, err = regexp.Compile(`^[a-zA-Z_][a-zA-Z0-9\._]+`)
-	if err != nil {
-		panic(err)
-	}
+type simpleToken struct {
+	token string
+	value int
 }
+
+type reToken struct {
+	re    string
+	value int
+}
+
+type compiledReToken struct {
+	re    *regexp.Regexp
+	value int
+}
+
+var simpleTokens = []simpleToken{
+	simpleToken{"(nil)", NIL},
+	simpleToken{"true", BOOL},
+	simpleToken{"false", BOOL},
+	simpleToken{"map", MAP},
+	simpleToken{"<INVALID>", INVALID},
+	simpleToken{"/*array*/", HINTARRAY},
+	simpleToken{"/*slice*/", HINTARRAY},
+	simpleToken{"/*map*/", HINTMAP},
+}
+
+var reTokens = []reToken{
+	reToken{`^(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")`, STRING},
+	reToken{`^0x[0-9a-f]+`, PTR},
+	reToken{`^-?\d+(?:[.,]\d+)?`, NUMBER},
+	reToken{`^interface\s*\{\}`, INTERFACE},
+	reToken{`^[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
+}
+
+var compiledReTokens = getCompiledReTokens()
+
+func getCompiledReTokens() []compiledReToken {
+	result := make([]compiledReToken, len(reTokens))
+	var err error
+	for i, _ := range reTokens {
+		result[i].re, err = regexp.Compile(reTokens[i].re)
+		if err != nil {
+			panic(err)
+		}
+		result[i].value = reTokens[i].value
+	}
+
+	return result
+}
+
+func strPtr(s string) *string { return &s }
 
 func (x *exprLex) Lex(yylval *yySymType) int {
 	for {
@@ -116,79 +122,44 @@ func (x *exprLex) Lex(yylval *yySymType) int {
 			return 0
 		}
 
-		if m := stringRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched String\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return STRING
-		} else if m := ptrRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched PTR\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return PTR
-		} else if m := nilRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched NIL\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return NIL
-		} else if m := numberRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched Number\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return NUMBER
-		} else if m := boolRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched BOOL\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return BOOL
-		} else if m := mapRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched MAP\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return MAP
-		} else if m := invalidRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched INVALID\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return INVALID
-		} else if m := identifierRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched IDENTIFIER\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return IDENTIFIER
-		} else {
-			c, size := utf8.DecodeRune(x.line)
-			x.line = x.line[size:]
-			if c == utf8.RuneError && size == 1 {
-				x.Error("Invalid utf8")
-				return 0
-			}
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched char\n")
-			}
-			switch c {
-			case ' ', '\t', '\n', '\r':
-				continue
-			default:
-				return int(c)
+		for _, token := range simpleTokens {
+			if bytes.HasPrefix(x.line, []byte(token.token)) {
+				if yyDebug >= 1 {
+					__yyfmt__.Printf("Matched %s\n", token.token)
+				}
+				x.line = x.line[len(token.token):]
+				yylval.string = token.token
+				return token.value
 			}
 		}
+
+		for _, token := range compiledReTokens {
+			if m := token.re.Find(x.line); m != nil {
+				if yyDebug >= 1 {
+					__yyfmt__.Printf("Matched %s\n", yyTokname(token.value))
+				}
+				x.line = x.line[len(m):]
+				yylval.string = string(m)
+				return token.value
+			}
+		}
+
+		c, size := utf8.DecodeRune(x.line)
+		x.line = x.line[size:]
+		if c == utf8.RuneError && size == 1 {
+			x.Error("Invalid utf8")
+			return 0
+		}
+		if yyDebug >= 1 {
+			__yyfmt__.Printf("Matched char '%s'\n", string(c))
+		}
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			continue
+		default:
+			return int(c)
+		}
+
 	}
 }
 
@@ -203,107 +174,118 @@ var yyExca = []int{
 	-2, 0,
 }
 
-const yyNprod = 38
+const yyNprod = 43
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 128
+const yyLast = 143
 
 var yyAct = []int{
 
-	3, 12, 7, 82, 83, 67, 68, 2, 4, 14,
-	36, 35, 60, 30, 11, 9, 8, 27, 13, 21,
-	54, 31, 44, 38, 10, 18, 16, 15, 29, 13,
-	23, 90, 28, 91, 22, 17, 94, 90, 43, 42,
-	74, 74, 89, 74, 74, 87, 80, 72, 78, 75,
-	50, 51, 62, 50, 65, 57, 79, 25, 49, 26,
-	64, 61, 19, 76, 20, 71, 70, 14, 66, 59,
-	53, 56, 73, 55, 48, 47, 77, 84, 25, 85,
-	84, 81, 85, 88, 93, 9, 86, 14, 13, 69,
-	24, 84, 96, 85, 85, 95, 97, 37, 58, 9,
-	86, 63, 13, 52, 9, 8, 46, 13, 32, 33,
-	16, 92, 34, 13, 45, 16, 15, 13, 13, 40,
-	39, 32, 33, 6, 41, 34, 5, 1,
+	67, 2, 68, 69, 66, 43, 42, 8, 37, 101,
+	79, 12, 9, 14, 11, 17, 15, 71, 54, 32,
+	45, 82, 10, 12, 9, 14, 11, 24, 15, 36,
+	28, 89, 13, 46, 10, 105, 50, 33, 53, 52,
+	16, 55, 63, 102, 58, 25, 12, 9, 14, 11,
+	70, 15, 91, 64, 88, 38, 83, 10, 70, 111,
+	78, 77, 75, 30, 81, 31, 76, 22, 80, 23,
+	84, 21, 18, 14, 20, 65, 15, 57, 88, 90,
+	85, 92, 19, 110, 73, 108, 98, 95, 96, 70,
+	100, 56, 99, 85, 85, 85, 103, 88, 106, 104,
+	97, 72, 94, 70, 85, 107, 70, 88, 109, 93,
+	85, 62, 87, 62, 29, 86, 74, 60, 61, 49,
+	48, 39, 40, 59, 14, 47, 44, 41, 39, 40,
+	34, 35, 51, 15, 41, 26, 27, 6, 5, 4,
+	3, 1, 7,
 }
 var yyPact = []int{
 
-	5, -1000, -1000, -1000, -1000, -1000, -1000, 16, 48, -1000,
-	14, 11, -1000, 76, -1000, 43, -1000, 12, 9, 104,
-	86, 3, 109, 108, 118, 117, 86, 2, 103, 95,
-	60, 59, -1000, -1000, -1000, 41, -1000, 33, 92, 54,
-	0, 58, 56, 38, 87, 53, -8, -1000, -1000, -1000,
-	86, 94, 52, 5, 78, -1000, -1000, -1000, 50, 5,
-	36, -1000, -1000, -1000, -1000, 105, 5, 32, -1000, 47,
-	5, 31, 40, 29, 5, -1000, 75, 28, -1000, 75,
-	-1000, -1000, 25, -1000, 15, 100, 70, -1000, 19, -1000,
-	75, 89, 64, 117, -1000, -1000, -1000, -1000,
+	35, -1000, -1000, -1000, -1000, -1000, -1000, 60, 50, -1000,
+	22, 128, 8, -1000, -1000, 97, -1000, 46, -1000, 14,
+	123, 7, 117, 112, -3, 111, 101, 100, 111, 126,
+	124, 112, -5, 111, 72, 58, 111, 105, 99, -1000,
+	-1000, -1000, 98, -1000, 21, 111, 56, -1000, 35, 35,
+	-6, 83, 66, 96, 111, 47, 35, 35, -13, -1000,
+	-1000, -1000, 112, 12, 37, 35, 95, -1000, 92, -1000,
+	10, 111, -1000, -1000, -1000, 33, 35, 89, 82, 111,
+	-1000, -1000, -1000, 35, 80, 35, -1000, -1000, 35, 0,
+	24, 35, 79, -1000, -1000, 16, 78, -1000, -1000, -1000,
+	-1000, -1000, 35, 65, -1000, 35, -1000, 63, -1000, 39,
+	-1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 1, 2, 13, 127, 6, 0, 8, 126, 123,
-	5, 10, 11, 4, 3,
+	0, 32, 142, 8, 7, 141, 0, 140, 139, 138,
+	137, 4, 5, 6, 3, 2,
 }
 var yyR1 = []int{
 
-	0, 4, 5, 5, 5, 5, 10, 10, 1, 2,
-	2, 6, 6, 6, 6, 3, 3, 3, 7, 7,
-	7, 12, 12, 11, 11, 11, 11, 8, 8, 8,
-	8, 9, 9, 14, 14, 14, 13, 13,
+	0, 5, 6, 6, 6, 6, 11, 11, 1, 2,
+	2, 7, 7, 7, 7, 3, 3, 3, 8, 8,
+	8, 13, 13, 12, 12, 12, 9, 9, 9, 9,
+	9, 9, 10, 10, 10, 10, 15, 15, 15, 14,
+	14, 4, 4,
 }
 var yyR2 = []int{
 
 	0, 1, 1, 1, 1, 1, 1, 3, 4, 1,
 	2, 5, 4, 2, 1, 1, 1, 1, 5, 4,
-	4, 1, 3, 0, 3, 3, 3, 8, 7, 7,
-	6, 9, 8, 0, 1, 3, 3, 3,
+	4, 1, 3, 0, 3, 3, 8, 7, 7, 6,
+	6, 5, 9, 8, 6, 5, 0, 1, 3, 3,
+	3, 1, 1,
 }
 var yyChk = []int{
 
-	-1000, -4, -5, -6, -7, -8, -9, -2, 11, 10,
-	19, 9, -1, 13, -1, 11, 10, 19, 9, 14,
-	16, 5, 20, 19, 14, 14, 16, 5, 20, 19,
-	-3, -1, 4, 5, 8, -12, -11, 11, 20, 11,
-	11, 6, -3, -12, 20, 11, 11, 15, 15, 17,
-	12, 18, 11, 16, 20, 15, 15, 17, 11, 16,
-	20, -11, -6, 7, -7, -2, 16, -10, -5, 11,
-	16, -10, 11, -10, 12, 17, 16, -10, 17, 16,
-	17, -5, -14, -13, -6, -2, 11, 17, -14, 17,
-	12, 18, 11, 14, 17, -13, -6, 7,
+	-1000, -5, -6, -7, -8, -9, -10, -2, -4, 12,
+	22, 14, 11, -1, 13, 16, -1, -4, 12, 22,
+	14, 11, 17, 19, 5, 23, 7, 8, 22, 17,
+	17, 19, 5, 23, 7, 8, 22, -3, -1, 4,
+	5, 10, -13, -12, 14, 23, -4, 14, 19, 19,
+	-4, 6, -3, -13, 23, -4, 19, 19, -4, 18,
+	18, 20, 15, 21, -4, 19, -11, -6, -15, -14,
+	-6, 23, 18, 18, 20, -4, 19, -11, -15, 23,
+	-12, -6, 9, 19, -11, 15, 20, 20, 15, 21,
+	-4, 19, -11, 20, 20, -4, -11, 20, -6, -14,
+	-6, 9, 19, -11, 20, 19, 20, -15, 20, -15,
+	20, 20,
 }
 var yyDef = []int{
 
 	0, -2, 1, 2, 3, 4, 5, 0, 0, 14,
-	0, 0, 9, 0, 10, 0, 13, 0, 0, 0,
-	23, 0, 0, 0, 0, 0, 23, 0, 0, 0,
-	0, 0, 15, 16, 17, 0, 21, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 12, 20, 19,
-	23, 0, 0, 0, 0, 8, 11, 18, 0, 0,
-	0, 22, 24, 25, 26, 0, 0, 0, 6, 0,
-	0, 0, 0, 0, 0, 30, 33, 0, 29, 33,
-	28, 7, 0, 34, 0, 0, 0, 27, 0, 32,
-	0, 0, 0, 0, 31, 35, 36, 37,
+	0, 41, 0, 9, 42, 0, 10, 0, 13, 0,
+	41, 0, 0, 23, 0, 0, 0, 0, 0, 0,
+	0, 23, 0, 0, 0, 0, 0, 0, 0, 15,
+	16, 17, 0, 21, 0, 0, 0, 41, 0, 36,
+	0, 0, 0, 0, 0, 0, 0, 36, 0, 12,
+	20, 19, 23, 0, 0, 0, 0, 6, 0, 37,
+	0, 0, 8, 11, 18, 0, 0, 0, 0, 0,
+	22, 24, 25, 0, 0, 0, 31, 35, 0, 0,
+	0, 0, 0, 30, 34, 0, 0, 29, 7, 38,
+	39, 40, 36, 0, 28, 36, 27, 0, 26, 0,
+	33, 32,
 }
 var yyTok1 = []int{
 
 	1, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 13, 3,
-	14, 15, 3, 3, 12, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 18, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 16, 3,
+	17, 18, 3, 3, 15, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 21, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 19, 3, 20, 3, 3, 3, 3, 3, 3,
+	3, 22, 3, 23, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 16, 3, 17,
+	3, 3, 3, 19, 3, 20,
 }
 var yyTok2 = []int{
 
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+	12, 13, 14,
 }
 var yyTok3 = []int{
 	0,
@@ -535,7 +517,7 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line dumper.y:42
+		//line dumper.y:46
 		{
 			yylex.(*exprLex).result = yyVAL.node
 		}
@@ -548,7 +530,7 @@ yydefault:
 	case 5:
 		yyVAL.node = yyS[yypt-0].node
 	case 6:
-		//line dumper.y:52
+		//line dumper.y:56
 		{
 			if yyS[yypt-0].node == nil {
 				yyVAL.node_list = nil
@@ -557,24 +539,24 @@ yydefault:
 			}
 		}
 	case 7:
-		//line dumper.y:60
+		//line dumper.y:64
 		{
 			yyVAL.node_list = append(yyS[yypt-2].node_list, yyS[yypt-0].node)
 		}
 	case 8:
-		//line dumper.y:65
+		//line dumper.y:69
 		{
 			yyVAL.string = yyS[yypt-1].string
 		}
 	case 9:
 		yyVAL.string = yyS[yypt-0].string
 	case 10:
-		//line dumper.y:71
+		//line dumper.y:75
 		{
 			yyVAL.string = yyS[yypt-1].string + "," + yyS[yypt-0].string
 		}
 	case 11:
-		//line dumper.y:76
+		//line dumper.y:80
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:   strPtr(yyS[yypt-4].string),
@@ -583,7 +565,7 @@ yydefault:
 			}
 		}
 	case 12:
-		//line dumper.y:84
+		//line dumper.y:88
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:  yyS[yypt-3].string,
@@ -591,7 +573,7 @@ yydefault:
 			}
 		}
 	case 13:
-		//line dumper.y:91
+		//line dumper.y:95
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:  strPtr(yyS[yypt-1].string),
@@ -599,7 +581,7 @@ yydefault:
 			}
 		}
 	case 14:
-		//line dumper.y:98
+		//line dumper.y:102
 		{
 			yyVAL.node = &BeautifyNode{
 				Type: yyS[yypt-0].string,
@@ -612,7 +594,7 @@ yydefault:
 	case 17:
 		yyVAL.string = yyS[yypt-0].string
 	case 18:
-		//line dumper.y:109
+		//line dumper.y:113
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:          strPtr(yyS[yypt-4].string),
@@ -621,7 +603,7 @@ yydefault:
 			}
 		}
 	case 19:
-		//line dumper.y:117
+		//line dumper.y:121
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:         yyS[yypt-3].string,
@@ -629,7 +611,7 @@ yydefault:
 			}
 		}
 	case 20:
-		//line dumper.y:124
+		//line dumper.y:128
 		{
 			yyVAL.node = &BeautifyNode{
 				Type: yyS[yypt-3].string,
@@ -637,7 +619,7 @@ yydefault:
 			}
 		}
 	case 21:
-		//line dumper.y:132
+		//line dumper.y:136
 		{
 			if yyS[yypt-0].structKV == nil {
 				yyVAL.structKVs = nil
@@ -646,31 +628,26 @@ yydefault:
 			}
 		}
 	case 22:
-		//line dumper.y:140
+		//line dumper.y:144
 		{
 			yyVAL.structKVs = append(yyS[yypt-2].structKVs, yyS[yypt-0].structKV)
 		}
 	case 23:
-		//line dumper.y:146
+		//line dumper.y:150
 		{
 			yyVAL.structKV = nil
 		}
 	case 24:
-		//line dumper.y:150
+		//line dumper.y:154
 		{
 			yyVAL.structKV = &StructKV{yyS[yypt-2].string, yyS[yypt-0].node}
 		}
 	case 25:
-		//line dumper.y:154
+		//line dumper.y:158
 		{
 			yyVAL.structKV = &StructKV{yyS[yypt-2].string, nil}
 		}
 	case 26:
-		//line dumper.y:158
-		{
-			yyVAL.structKV = &StructKV{yyS[yypt-2].string, yyS[yypt-0].node}
-		}
-	case 27:
 		//line dumper.y:163
 		{
 			yyVAL.node = &BeautifyNode{
@@ -679,7 +656,7 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 28:
+	case 27:
 		//line dumper.y:171
 		{
 			yyVAL.node = &BeautifyNode{
@@ -687,7 +664,7 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 29:
+	case 28:
 		//line dumper.y:178
 		{
 			yyVAL.node = &BeautifyNode{
@@ -696,7 +673,7 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 30:
+	case 29:
 		//line dumper.y:186
 		{
 			yyVAL.node = &BeautifyNode{
@@ -704,8 +681,25 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
+	case 30:
+		//line dumper.y:193
+		{
+			yyVAL.node = &BeautifyNode{
+				Ptr:         strPtr(yyS[yypt-5].string),
+				Type:        yyS[yypt-4].string,
+				ArrayValues: yyS[yypt-1].node_list,
+			}
+		}
 	case 31:
-		//line dumper.y:194
+		//line dumper.y:201
+		{
+			yyVAL.node = &BeautifyNode{
+				Type:        yyS[yypt-4].string,
+				ArrayValues: yyS[yypt-1].node_list,
+			}
+		}
+	case 32:
+		//line dumper.y:209
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:        strPtr(yyS[yypt-8].string),
@@ -713,39 +707,60 @@ yydefault:
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 32:
-		//line dumper.y:202
+	case 33:
+		//line dumper.y:217
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:       "map[" + yyS[yypt-5].string + "]" + yyS[yypt-3].string,
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 33:
-		//line dumper.y:210
+	case 34:
+		//line dumper.y:224
+		{
+			yyVAL.node = &BeautifyNode{
+				Ptr:        strPtr(yyS[yypt-5].string),
+				Type:       yyS[yypt-4].string,
+				HashValues: yyS[yypt-1].hashKVs,
+			}
+		}
+	case 35:
+		//line dumper.y:232
+		{
+			yyVAL.node = &BeautifyNode{
+				Type:       yyS[yypt-4].string,
+				HashValues: yyS[yypt-1].hashKVs,
+			}
+		}
+	case 36:
+		//line dumper.y:240
 		{
 			yyVAL.hashKVs = nil
 		}
-	case 34:
-		//line dumper.y:214
+	case 37:
+		//line dumper.y:244
 		{
 			yyVAL.hashKVs = []*HashKV{yyS[yypt-0].hashKV}
 		}
-	case 35:
-		//line dumper.y:218
+	case 38:
+		//line dumper.y:248
 		{
 			yyVAL.hashKVs = append(yyS[yypt-2].hashKVs, yyS[yypt-0].hashKV)
 		}
-	case 36:
-		//line dumper.y:223
+	case 39:
+		//line dumper.y:253
 		{
 			yyVAL.hashKV = &HashKV{yyS[yypt-2].node, yyS[yypt-0].node}
 		}
-	case 37:
-		//line dumper.y:227
+	case 40:
+		//line dumper.y:257
 		{
 			yyVAL.hashKV = &HashKV{yyS[yypt-2].node, nil}
 		}
+	case 41:
+		yyVAL.string = yyS[yypt-0].string
+	case 42:
+		yyVAL.string = yyS[yypt-0].string
 	}
 	goto yystack /* stack new state and value */
 }

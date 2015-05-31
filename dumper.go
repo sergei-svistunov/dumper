@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 )
 
 func Dump(w io.Writer, variable interface{}) {
@@ -18,6 +19,38 @@ func DumpToString(i interface{}) string {
 	buf := new(bytes.Buffer)
 	Dump(buf, i)
 	return buf.String()
+}
+
+type reflectValues []reflect.Value
+
+func (v reflectValues) Len() int {
+	return len(v)
+}
+
+// Not all reflectValues can be sorted, but for tests it's enaugh
+func (v reflectValues) Less(i, j int) bool {
+	if v[i].Kind() != v[j].Kind() {
+		return false
+	}
+
+	switch v[i].Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v[i].Int() < v[j].Int()
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v[i].Uint() < v[j].Uint()
+	case reflect.Float32, reflect.Float64:
+		return v[i].Float() < v[j].Float()
+	case reflect.Ptr:
+		return v[i].UnsafeAddr() < v[j].UnsafeAddr()
+	case reflect.String:
+		return v[i].String() < v[j].String()
+	}
+
+	return false
+}
+
+func (v reflectValues) Swap(i, j int)  {
+	v[i], v[j] = v[j], v[i]
 }
 
 type dumper struct {
@@ -66,7 +99,11 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 		}
 		fmt.Fprint(w, "}")
 	case reflect.Array, reflect.Slice:
-		fmt.Fprintf(w, "%s{", reflectValue.Type().String())
+		if reflectValue.Type().Name() == "" {
+			fmt.Fprintf(w, "%s{", reflectValue.Type().String())
+		} else {
+			fmt.Fprintf(w, "%s/*%s*/{", reflectValue.Type().String(), reflectValue.Type().Kind().String())
+		}
 		for i := 0; i < reflectValue.Len(); i++ {
 			if i != 0 {
 				fmt.Fprint(w, ",")
@@ -75,8 +112,13 @@ func (d *dumper) printReflect(w io.Writer, reflectValue reflect.Value) {
 		}
 		fmt.Fprint(w, "}")
 	case reflect.Map:
-		fmt.Fprintf(w, "%s{", reflectValue.Type().String())
-		keys := reflectValue.MapKeys()
+		if reflectValue.Type().Name() == "" {
+			fmt.Fprintf(w, "%s{", reflectValue.Type().String())
+		} else {
+			fmt.Fprintf(w, "%s/*%s*/{", reflectValue.Type().String(), reflectValue.Type().Kind().String())
+		}
+		keys := reflectValues(reflectValue.MapKeys())
+		sort.Sort(keys)
 		for i, key := range keys {
 			if i != 0 {
 				fmt.Fprint(w, ",")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"unicode/utf8"
 	"regexp"
+	"bytes"
 	__yyfmt__ "fmt"
 )
 %}
@@ -22,13 +23,16 @@ import (
 %token  STRING
 %token 	NUMBER
 %token 	PTR
+%token	HINTARRAY
+%token	HINTMAP
 %token 	NIL
 %token	BOOL
 %token	MAP
 %token	INVALID
+%token	INTERFACE
 %token 	IDENTIFIER
 
-%type	<string>	STRING, NUMBER, PTR, NIL, BOOL, MAP, INVALID, IDENTIFIER, ptr, ptrs, scalar_value
+%type	<string>	STRING, NUMBER, PTR, HINTARRAY, HINTMAP, NIL, BOOL, MAP, INVALID, INTERFACE, IDENTIFIER, ptr, ptrs, scalar_value, type_name
 %type	<node>		top, expr, scalar, struct, array, hash
 %type	<node_list> expr_list
 %type	<structKV>	struct_kv
@@ -72,7 +76,7 @@ ptrs:		ptr
 					$$ = $1 + "," + $2
 				}
 					
-scalar:		ptrs IDENTIFIER '(' scalar_value ')'
+scalar:		ptrs type_name '(' scalar_value ')'
 				{ 
 					$$ =  &BeautifyNode{
 						Ptr:   strPtr($1),
@@ -80,7 +84,7 @@ scalar:		ptrs IDENTIFIER '(' scalar_value ')'
 						Value: strPtr($4),		
 					}
 				}
-		|	IDENTIFIER '(' scalar_value ')'
+		|	type_name '(' scalar_value ')'
 				{ 
 					$$ =  &BeautifyNode{
 						Type:  $1,
@@ -105,7 +109,7 @@ scalar_value:	STRING
 			|	NUMBER
 			|	BOOL
 
-struct:		ptrs IDENTIFIER '{' struct_kvs '}'
+struct:		ptrs type_name '{' struct_kvs '}'
 				{ 
 					$$ = &BeautifyNode{
 						Ptr:          strPtr($1),
@@ -113,14 +117,14 @@ struct:		ptrs IDENTIFIER '{' struct_kvs '}'
 						StructValues: $4,
 					}
 				}
-		|	IDENTIFIER '{' struct_kvs '}'
+		|	type_name '{' struct_kvs '}'
 				{ 
 					$$ = &BeautifyNode{
 						Type:         $1,
 						StructValues: $3,
 					}
 				}
-		|	IDENTIFIER '(' ptr ')'
+		|	type_name '(' ptr ')'
 				{ 
 					$$ = &BeautifyNode{
 						Type:         $1,
@@ -146,7 +150,7 @@ struct_kv:
 				{
 					$$ = nil
 				}
-		|	IDENTIFIER ':' scalar
+		|	IDENTIFIER ':' expr
 				{
 					$$ = &StructKV{$1, $3}
 				}
@@ -154,12 +158,8 @@ struct_kv:
 				{
 					$$ = &StructKV{$1, nil}
 				}
-		|	IDENTIFIER ':' struct
-				{
-					$$ = &StructKV{$1, $3}
-				}
 				
-array:		ptrs '[' NUMBER ']' IDENTIFIER '{' expr_list '}'
+array:		ptrs '[' NUMBER ']' type_name '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
 						Ptr:         strPtr($1),
@@ -167,14 +167,14 @@ array:		ptrs '[' NUMBER ']' IDENTIFIER '{' expr_list '}'
 						ArrayValues: $7,
 					}
 				}
-		|	'[' NUMBER ']' IDENTIFIER '{' expr_list '}'
+		|	'[' NUMBER ']' type_name '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
 						Type:        "[" + $2 + "]" + $4,
 						ArrayValues: $6,
 					}
 				}
-		|	ptrs '[' ']' IDENTIFIER '{' expr_list '}'
+		|	ptrs '[' ']' type_name '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
 						Ptr:         strPtr($1),
@@ -182,15 +182,30 @@ array:		ptrs '[' NUMBER ']' IDENTIFIER '{' expr_list '}'
 						ArrayValues: $6,
 					}
 				}
-		|	'[' ']' IDENTIFIER '{' expr_list '}'
+		|	'[' ']' type_name '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
 						Type:        "[]" + $3,
 						ArrayValues: $5,
 					}
 				}
+		|	ptrs IDENTIFIER HINTARRAY '{' expr_list '}'
+				{
+					$$ = &BeautifyNode{
+						Ptr:         strPtr($1),
+						Type:        $2,
+						ArrayValues: $5,
+					}
+				}
+		|	IDENTIFIER HINTARRAY '{' expr_list '}'
+				{
+					$$ = &BeautifyNode{
+						Type:        $1,
+						ArrayValues: $4,
+					}
+				}
 				
-hash:		ptrs MAP '[' IDENTIFIER ']' IDENTIFIER '{' hash_kvs '}'
+hash:		ptrs MAP '[' type_name ']' type_name '{' hash_kvs '}'
 				{
 					$$ = &BeautifyNode{
 						Ptr:		strPtr($1),	
@@ -198,14 +213,29 @@ hash:		ptrs MAP '[' IDENTIFIER ']' IDENTIFIER '{' hash_kvs '}'
 						HashValues: $8,
 					}
 				}
-		|	MAP '[' IDENTIFIER ']' IDENTIFIER '{' hash_kvs '}'
+		|	MAP '[' type_name ']' type_name '{' hash_kvs '}'
 				{
 					$$ = &BeautifyNode{
 						Type:       "map[" + $3 + "]" + $5,
 						HashValues: $7,
 					}
+				}		
+		|	ptrs IDENTIFIER HINTMAP '{' hash_kvs '}'
+				{
+					$$ = &BeautifyNode{
+						Ptr:		strPtr($1),	
+						Type:       $2,
+						HashValues: $5,
+					}
 				}
-				
+		|	IDENTIFIER HINTMAP '{' hash_kvs '}'
+				{
+					$$ = &BeautifyNode{
+						Type:       $1,
+						HashValues: $4,
+					}
+				}
+
 hash_kvs:	
 			{
 				$$ = nil
@@ -219,75 +249,77 @@ hash_kvs:
 				$$ = append($1, $3)
 			}
 		
-hash_kv:	scalar ':' scalar
+hash_kv:	expr ':' expr
 			{
 				$$ = &HashKV{$1, $3}
 			}
-		|	scalar ':' NIL
+		|	expr ':' NIL
 			{
 				$$ = &HashKV{$1, nil}
 			}
+			
+type_name:	IDENTIFIER
+		|	INTERFACE
 %%
 
 type exprLex struct {
-        line   []byte
-        peek   rune
-        result *BeautifyNode
-        err error
+	line   []byte
+	peek   rune
+	result *BeautifyNode
+	err    error
 }
 
-func strPtr(s string) *string {return &s}
+type simpleToken struct {
+	token string
+	value int
+}
 
-var stringRe, numberRe, ptrRe, nilRe, boolRe, mapRe, invalidRe, identifierRe *regexp.Regexp
+type reToken struct {
+	re    string
+	value int
+}
 
-func init() {
+type compiledReToken struct {
+	re    *regexp.Regexp
+	value int
+}
+
+var simpleTokens = []simpleToken{
+	simpleToken{"(nil)", NIL},
+	simpleToken{"true", BOOL},
+	simpleToken{"false", BOOL},
+	simpleToken{"map", MAP},
+	simpleToken{"<INVALID>", INVALID},
+	simpleToken{"/*array*/", HINTARRAY},
+	simpleToken{"/*slice*/", HINTARRAY},
+	simpleToken{"/*map*/", HINTMAP},
+}
+
+var reTokens = []reToken{
+	reToken{`^(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")`, STRING},
+	reToken{`^0x[0-9a-f]+`, PTR},	
+	reToken{`^-?\d+(?:[.,]\d+)?`, NUMBER},	
+	reToken{`^interface\s*\{\}`, INTERFACE},
+	reToken{`^[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
+}
+
+var compiledReTokens = getCompiledReTokens()
+
+func getCompiledReTokens() []compiledReToken {
+	result := make([]compiledReToken, len(reTokens))
 	var err error
-
-	stringRe, err = regexp.Compile(`^(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")`)
-	if err != nil {
-		panic(err)
+	for i, _ := range reTokens {
+		result[i].re, err = regexp.Compile(reTokens[i].re)
+		if err != nil {
+			panic(err)
+		}
+		result[i].value = reTokens[i].value
 	}
 
-	numberRe, err = regexp.Compile(`^-?\d+(?:[.,]\d+)?`)
-	if err != nil {
-		panic(err)
-	}
-
-	ptrRe, err = regexp.Compile(`^0x[0-9a-f]+`)
-	if err != nil {
-		panic(err)
-	}
-	
-	nilRe, err = regexp.Compile(`^\(nil\)`)
-	if err != nil {
-		panic(err)
-	}
-	
-	nilRe, err = regexp.Compile(`^\(nil\)`)
-	if err != nil {
-		panic(err)
-	}
-
-	boolRe, err = regexp.Compile(`^(?:true|false)`)
-	if err != nil {
-		panic(err)
-	}
-
-	mapRe, err = regexp.Compile(`^map`)
-	if err != nil {
-		panic(err)
-	}
-	
-	invalidRe, err = regexp.Compile(`^<INVALID>`)
-	if err != nil {
-		panic(err)
-	}
-	
-	identifierRe, err = regexp.Compile(`^[a-zA-Z_][a-zA-Z0-9\._]+`)
-	if err != nil {
-		panic(err)
-	}
+	return result
 }
+
+func strPtr(s string) *string { return &s }
 
 func (x *exprLex) Lex(yylval *yySymType) int {
 	for {
@@ -297,80 +329,45 @@ func (x *exprLex) Lex(yylval *yySymType) int {
 		if len(x.line) == 0 {
 			return 0
 		}
-	
-		if m := stringRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched String\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return STRING
-		} else if m := ptrRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched PTR\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return PTR
-		} else if m := nilRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched NIL\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return NIL
-		} else if m := numberRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched Number\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return NUMBER
-		} else if m := boolRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched BOOL\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return BOOL
-		} else if m := mapRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched MAP\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return MAP
-		} else if m := invalidRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched INVALID\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return INVALID
-		} else if m := identifierRe.Find(x.line); m != nil {
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched IDENTIFIER\n")
-			}
-			x.line = x.line[len(m):]
-			yylval.string = string(m)
-			return IDENTIFIER
-		} else {
-			c, size := utf8.DecodeRune(x.line)
-			x.line = x.line[size:]
-			if c == utf8.RuneError && size == 1 {
-				x.Error("Invalid utf8")
-				return 0
-			}
-			if yyDebug >= 1 {
-				__yyfmt__.Print("Matched char\n")
-			}
-			switch c {
-			case ' ', '\t', '\n', '\r':
-				continue
-			default:
-				return int(c)
+
+		for _, token := range simpleTokens {
+			if bytes.HasPrefix(x.line, []byte(token.token)) {
+				if yyDebug >= 1 {
+					__yyfmt__.Printf("Matched %s\n", token.token)
+				}
+				x.line = x.line[len(token.token):]
+				yylval.string = token.token
+				return token.value
 			}
 		}
+
+		for _, token := range compiledReTokens {
+			if m := token.re.Find(x.line); m != nil {
+				if yyDebug >= 1 {
+					__yyfmt__.Printf("Matched %s\n", yyTokname(token.value))
+				}
+				x.line = x.line[len(m):]
+				yylval.string = string(m)
+				return token.value
+			}
+		}
+
+		c, size := utf8.DecodeRune(x.line)
+		x.line = x.line[size:]
+		if c == utf8.RuneError && size == 1 {
+			x.Error("Invalid utf8")
+			return 0
+		}
+		if yyDebug >= 1 {
+			__yyfmt__.Printf("Matched char '%s'\n", string(c))
+		}
+		switch c {
+		case ' ', '\t', '\n', '\r':
+			continue
+		default:
+			return int(c)
+		}
+
 	}
 }
 

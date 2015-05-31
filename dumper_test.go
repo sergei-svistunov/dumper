@@ -15,7 +15,12 @@ type testStruct struct {
 	f1 int
 	f2 string
 	f3 *testStruct
+	f4 interface{}
 }
+
+type ArrayAlias [3]int
+type SliceAlias []int
+type MapAlias map[int]int
 
 func sPtr(s string) *string { return &s }
 
@@ -143,9 +148,10 @@ func TestDumpStruct(t *testing.T) {
 				f1: 3,
 			},
 		},
+		f4: 100,
 	}
 
-	check(t, s, `testStruct{f1:int(1),f2:string(""),f3:&(0xADDR)testStruct{f1:int(2),f2:string(""),f3:&(0xADDR)testStruct{f1:int(3),f2:string(""),f3:(nil)}}}`, "Struct")
+	check(t, s, `testStruct{f1:int(1),f2:string(""),f3:&(0xADDR)testStruct{f1:int(2),f2:string(""),f3:&(0xADDR)testStruct{f1:int(3),f2:string(""),f3:(nil),f4:<INVALID>},f4:<INVALID>},f4:int(100)}`, "Struct")
 	checkBeautify(t, s, &dumper.BeautifyNode{
 		Type: "testStruct",
 		StructValues: []*dumper.StructKV{
@@ -164,17 +170,20 @@ func TestDumpStruct(t *testing.T) {
 							&dumper.StructKV{"f1", &dumper.BeautifyNode{Type: "int", Value: sPtr("3")}},
 							&dumper.StructKV{"f2", &dumper.BeautifyNode{Type: "string", Value: sPtr(`""`)}},
 							&dumper.StructKV{"f3", nil},
+							&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "<INVALID>"}},
 						},
 					},
 					},
+					&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "<INVALID>"}},
 				},
 			},
 			},
+			&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "int", Value: sPtr("100")}},
 		},
 	}, "Struct beautify")
 
 	s.f3.f3.f3 = &s
-	check(t, s, `testStruct{f1:int(1),f2:string(""),f3:&(0xADDR)testStruct{f1:int(2),f2:string(""),f3:&(0xADDR)testStruct{f1:int(3),f2:string(""),f3:&(0xADDR)testStruct{f1:int(1),f2:string(""),f3:testStruct(&(0xADDR))}}}}`, "Struct with cycle")
+	check(t, s, `testStruct{f1:int(1),f2:string(""),f3:&(0xADDR)testStruct{f1:int(2),f2:string(""),f3:&(0xADDR)testStruct{f1:int(3),f2:string(""),f3:&(0xADDR)testStruct{f1:int(1),f2:string(""),f3:testStruct(&(0xADDR)),f4:int(100)},f4:<INVALID>},f4:<INVALID>},f4:int(100)}`, "Struct with cycle")
 	checkBeautify(t, &s, &dumper.BeautifyNode{
 		Ptr:  sPtr("0xADDR"),
 		Type: "testStruct",
@@ -194,12 +203,15 @@ func TestDumpStruct(t *testing.T) {
 							&dumper.StructKV{"f1", &dumper.BeautifyNode{Type: "int", Value: sPtr("3")}},
 							&dumper.StructKV{"f2", &dumper.BeautifyNode{Type: "string", Value: sPtr(`""`)}},
 							&dumper.StructKV{"f3", &dumper.BeautifyNode{Ptr: sPtr("0xADDR"), Type: "testStruct"}},
+							&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "<INVALID>"}},
 						},
 					},
 					},
+					&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "<INVALID>"}},
 				},
 			},
 			},
+			&dumper.StructKV{"f4", &dumper.BeautifyNode{Type: "int", Value: sPtr("100")}},
 		},
 	}, "Struct with cycle beautify")
 }
@@ -207,6 +219,9 @@ func TestDumpStruct(t *testing.T) {
 func TestDumpArray(t *testing.T) {
 	check(t, [3]int{1, 2, 3}, "[3]int{int(1),int(2),int(3)}", "Array")
 	check(t, &[3]int{1, 2, 3}, "&(0xADDR)[3]int{int(1),int(2),int(3)}", "Ptr to array")
+	check(t, [3]interface{}{1, 2, 3}, "[3]interface {}{int(1),int(2),int(3)}", "Array of interface")
+	check(t, ArrayAlias{1, 2, 3}, "dumper_test.ArrayAlias/*array*/{int(1),int(2),int(3)}", "Array alias")
+	check(t, &ArrayAlias{1, 2, 3}, "&(0xADDR)dumper_test.ArrayAlias/*array*/{int(1),int(2),int(3)}", "Ptr to array alias")
 
 	checkBeautify(t, [3]int{1, 2, 3}, &dumper.BeautifyNode{
 		Type: "[3]int",
@@ -227,11 +242,41 @@ func TestDumpArray(t *testing.T) {
 		},
 	}, "Ptr to array beautify")
 
+	checkBeautify(t, [3]interface{}{1, 2, 3}, &dumper.BeautifyNode{
+		Type: "[3]interface {}",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Array of interface beautify")
+
+	checkBeautify(t, ArrayAlias{1, 2, 3}, &dumper.BeautifyNode{
+		Type: "dumper_test.ArrayAlias",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Array alias beautify")
+
+	checkBeautify(t, &ArrayAlias{1, 2, 3}, &dumper.BeautifyNode{
+		Ptr:  sPtr("0xADDR"),
+		Type: "dumper_test.ArrayAlias",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Ptr to array beautify")
 }
 
 func TestDumpSlice(t *testing.T) {
 	check(t, []int{1, 2, 3}, "[]int{int(1),int(2),int(3)}", "Slice")
 	check(t, &[]int{1, 2, 3}, "&(0xADDR)[]int{int(1),int(2),int(3)}", "Ptr to slice")
+	check(t, []interface{}{1, 2, 3}, "[]interface {}{int(1),int(2),int(3)}", "Slice of interface{}")
+	check(t, SliceAlias{1, 2, 3}, "dumper_test.SliceAlias/*slice*/{int(1),int(2),int(3)}", "Slice alias")
+	check(t, &SliceAlias{1, 2, 3}, "&(0xADDR)dumper_test.SliceAlias/*slice*/{int(1),int(2),int(3)}", "Ptr to slice alias")
 
 	checkBeautify(t, []int{1, 2, 3}, &dumper.BeautifyNode{
 		Type: "[]int",
@@ -251,12 +296,42 @@ func TestDumpSlice(t *testing.T) {
 			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
 		},
 	}, "Ptr to slice beautify")
+
+	checkBeautify(t, []interface{}{1, 2, 3}, &dumper.BeautifyNode{
+		Type: "[]interface {}",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Slice of interface beautify")
+
+	checkBeautify(t, SliceAlias{1, 2, 3}, &dumper.BeautifyNode{
+		Type: "dumper_test.SliceAlias",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Slice alias beautify")
+
+	checkBeautify(t, &SliceAlias{1, 2, 3}, &dumper.BeautifyNode{
+		Ptr:  sPtr("0xADDR"),
+		Type: "dumper_test.SliceAlias",
+		ArrayValues: []*dumper.BeautifyNode{
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+			&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+		},
+	}, "Ptr to slice alias beautify")
 }
 
 func TestDumpMap(t *testing.T) {
-	t.Skip("Need keys sorting")
 	check(t, map[int]int{1: 10, 2: 20, 3: 30}, "map[int]int{int(1):int(10),int(2):int(20),int(3):int(30)}", "Map")
-	check(t, &map[int]int{1: 10, 2: 20, 3: 30}, "&(0xADDR)map[int]int{int(1):int(10),int(2):int(20),int(3):int(30)}", "Map")
+	check(t, &map[int]int{1: 10, 2: 20, 3: 30}, "&(0xADDR)map[int]int{int(1):int(10),int(2):int(20),int(3):int(30)}", "Ptr to Map")
+	check(t, map[int]interface{}{1: 10, 2: 20, 3: 30}, "map[int]interface {}{int(1):int(10),int(2):int(20),int(3):int(30)}", "Map of interface{}")
+	check(t, MapAlias{1: 10, 2: 20, 3: 30}, "dumper_test.MapAlias/*map*/{int(1):int(10),int(2):int(20),int(3):int(30)}", "Map alias")
+	check(t, &MapAlias{1: 10, 2: 20, 3: 30}, "&(0xADDR)dumper_test.MapAlias/*map*/{int(1):int(10),int(2):int(20),int(3):int(30)}", "Ptr to map alias")
 
 	checkBeautify(t, map[int]int{1: 10, 2: 20, 3: 30}, &dumper.BeautifyNode{
 		Type: "map[int]int",
@@ -294,4 +369,60 @@ func TestDumpMap(t *testing.T) {
 			},
 		},
 	}, "Ptr to map beautify")
+
+	checkBeautify(t, map[int]interface{}{1: 10, 2: 20, 3: 30}, &dumper.BeautifyNode{
+		Type: "map[int]interface {}",
+		HashValues: []*dumper.HashKV{
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("10")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("20")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("30")},
+			},
+		},
+	}, "Map of interface beautify")
+
+	checkBeautify(t, MapAlias{1: 10, 2: 20, 3: 30}, &dumper.BeautifyNode{
+		Type: "dumper_test.MapAlias",
+		HashValues: []*dumper.HashKV{
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("10")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("20")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("30")},
+			},
+		},
+	}, "Map alias beautify")
+
+	checkBeautify(t, &MapAlias{1: 10, 2: 20, 3: 30}, &dumper.BeautifyNode{
+		Ptr:  sPtr("0xADDR"),
+		Type: "dumper_test.MapAlias",
+		HashValues: []*dumper.HashKV{
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("1")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("10")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("2")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("20")},
+			},
+			&dumper.HashKV{
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("3")},
+				&dumper.BeautifyNode{Type: "int", Value: sPtr("30")},
+			},
+		},
+	}, "Ptr to map alias beautify")
+
 }
