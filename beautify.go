@@ -1,6 +1,9 @@
 package dumper
 
-import ()
+import (
+	"bytes"
+	"encoding/json"
+)
 
 type BeautifyNode struct {
 	Ptr          *string
@@ -81,6 +84,68 @@ func (n *BeautifyNode) identString(ntabs uint) string {
 	}
 
 	return result + spaces + "}"
+}
+
+func (n *BeautifyNode) MarshalJSON() ([]byte, error) {
+	buf := &bytes.Buffer{}
+	buf.WriteByte('{')
+
+	if n.Ptr != nil {
+		buf.WriteString(`"Ptr":`)
+		jsonB, err := json.Marshal(*(n.Ptr))
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(jsonB)
+		buf.WriteByte(',')
+	}
+
+	buf.WriteString(`"Type":`)
+	jsonB, err := json.Marshal(n.Type)
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(jsonB)
+
+	if n.Value != nil {
+		buf.WriteString(`,"Value":`)
+		jsonB, err := json.Marshal(*(n.Value))
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(jsonB)
+	}
+
+	if n.StructValues != nil {
+		buf.WriteString(`,"StructValues":`)
+		jsonB, err := json.Marshal(n.StructValues)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(jsonB)
+	}
+
+	if n.HashValues != nil {
+		buf.WriteString(`,"HashValues":`)
+		jsonB, err := json.Marshal(n.HashValues)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(jsonB)
+	}
+
+	if n.ArrayValues != nil {
+		buf.WriteString(`,"ArrayValues":`)
+		jsonB, err := json.Marshal(n.ArrayValues)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(jsonB)
+	}
+
+	buf.WriteByte('}')
+
+	return buf.Bytes(), nil
 }
 
 func GetBeautifyTree(dump []byte) (*BeautifyNode, error) {
