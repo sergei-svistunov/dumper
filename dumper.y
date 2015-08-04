@@ -31,8 +31,9 @@ import (
 %token	INVALID
 %token	INTERFACE
 %token 	IDENTIFIER
+%token	UNKNOWN
 
-%type	<string>	STRING, NUMBER, PTR, HINTARRAY, HINTMAP, NIL, BOOL, MAP, INVALID, INTERFACE, IDENTIFIER, ptr, ptrs, scalar_value, type_name
+%type	<string>	STRING, NUMBER, PTR, HINTARRAY, HINTMAP, NIL, BOOL, MAP, INVALID, INTERFACE, IDENTIFIER, UNKNOWN, ptr, ptrs, scalar_value, type_name
 %type	<node>		top, expr, scalar, struct, array, hash
 %type	<node_list> expr_list
 %type	<structKV>	struct_kv
@@ -51,8 +52,12 @@ expr:		scalar
 		|	struct
 		|	array
 		|	hash
-		
-expr_list:	expr
+
+expr_list:
+				{
+					$$ = nil
+				}
+		| expr
 				{
 					if $1 == nil {
 						$$ = nil
@@ -60,57 +65,58 @@ expr_list:	expr
 						$$ = []*BeautifyNode{$1}
 					}
 				}
-		|	expr_list ',' expr	
+		|	expr_list ',' expr
 				{
 					$$ = append($1, $3)
 				}
-	
+
 ptr:		'&' '(' PTR ')'
 				{
 					$$ = $3
 				}
-				
+
 ptrs:		ptr
 		|	ptrs ptr
 				{
 					$$ = $1 + "," + $2
 				}
-					
+
 scalar:		ptrs type_name '(' scalar_value ')'
-				{ 
+				{
 					$$ =  &BeautifyNode{
 						Ptr:   strPtr($1),
 						Type:  $2,
-						Value: strPtr($4),		
+						Value: strPtr($4),
 					}
 				}
 		|	type_name '(' scalar_value ')'
-				{ 
+				{
 					$$ =  &BeautifyNode{
 						Type:  $1,
-						Value: strPtr($3),		
+						Value: strPtr($3),
 					}
 				}
 		|	ptrs INVALID
 				{
 					$$ =  &BeautifyNode{
 						Ptr:   strPtr($1),
-						Type:  $2,		
+						Type:  $2,
 					}
 				}
 		|	INVALID
 				{
 					$$ =  &BeautifyNode{
-						Type:  $1,		
+						Type:  $1,
 					}
 				}
 
 scalar_value:	STRING
 			|	NUMBER
 			|	BOOL
+			|	UNKNOWN
 
 struct:		ptrs type_name '{' struct_kvs '}'
-				{ 
+				{
 					$$ = &BeautifyNode{
 						Ptr:          strPtr($1),
 						Type:         $2,
@@ -118,20 +124,20 @@ struct:		ptrs type_name '{' struct_kvs '}'
 					}
 				}
 		|	type_name '{' struct_kvs '}'
-				{ 
+				{
 					$$ = &BeautifyNode{
 						Type:         $1,
 						StructValues: $3,
 					}
 				}
 		|	type_name '(' ptr ')'
-				{ 
+				{
 					$$ = &BeautifyNode{
 						Type:         $1,
 						Ptr:          strPtr($3),
 					}
 				}
-				
+
 struct_kvs:	struct_kv
 				{
 					if $1 == nil {
@@ -146,7 +152,7 @@ struct_kvs:	struct_kv
 				}
 
 
-struct_kv:	
+struct_kv:
 				{
 					$$ = nil
 				}
@@ -158,7 +164,7 @@ struct_kv:
 				{
 					$$ = &StructKV{$1, nil}
 				}
-				
+
 array:		ptrs '[' NUMBER ']' type_name '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
@@ -189,6 +195,21 @@ array:		ptrs '[' NUMBER ']' type_name '{' expr_list '}'
 						ArrayValues: $5,
 					}
 				}
+		|	ptrs '[' ']' '[' ']' type_name '{' expr_list '}'
+				{
+					$$ = &BeautifyNode{
+						Ptr:         strPtr($1),
+						Type:        "[]" + $6,
+						ArrayValues: $8,
+					}
+				}
+		|	'[' ']' '[' ']' type_name '{' expr_list '}'
+				{
+					$$ = &BeautifyNode{
+						Type:        "[]" + $5,
+						ArrayValues: $7,
+					}
+				}
 		|	ptrs IDENTIFIER HINTARRAY '{' expr_list '}'
 				{
 					$$ = &BeautifyNode{
@@ -204,11 +225,11 @@ array:		ptrs '[' NUMBER ']' type_name '{' expr_list '}'
 						ArrayValues: $4,
 					}
 				}
-				
+
 hash:		ptrs MAP '[' type_name ']' type_name '{' hash_kvs '}'
 				{
 					$$ = &BeautifyNode{
-						Ptr:		strPtr($1),	
+						Ptr:		strPtr($1),
 						Type:       "map[" + $4 + "]" + $6,
 						HashValues: $8,
 					}
@@ -219,11 +240,25 @@ hash:		ptrs MAP '[' type_name ']' type_name '{' hash_kvs '}'
 						Type:       "map[" + $3 + "]" + $5,
 						HashValues: $7,
 					}
-				}		
+				}
+		|	ptrs MAP '[' type_name ']' '[' ']' type_name '{' hash_kvs '}'
+				{
+					$$ = &BeautifyNode{
+						Type:       "map[" + $4 + "]" + $8,
+						HashValues: $10,
+					}
+				}
+		|	MAP '[' type_name ']' '[' ']' type_name '{' hash_kvs '}'
+				{
+					$$ = &BeautifyNode{
+						Type:       "map[" + $3 + "]" + $7,
+						HashValues: $9,
+					}
+				}
 		|	ptrs IDENTIFIER HINTMAP '{' hash_kvs '}'
 				{
 					$$ = &BeautifyNode{
-						Ptr:		strPtr($1),	
+						Ptr:		strPtr($1),
 						Type:       $2,
 						HashValues: $5,
 					}
@@ -236,7 +271,7 @@ hash:		ptrs MAP '[' type_name ']' type_name '{' hash_kvs '}'
 					}
 				}
 
-hash_kvs:	
+hash_kvs:
 			{
 				$$ = nil
 			}
@@ -248,7 +283,7 @@ hash_kvs:
 			{
 				$$ = append($1, $3)
 			}
-		
+
 hash_kv:	expr ':' expr
 			{
 				$$ = &HashKV{$1, $3}
@@ -257,7 +292,7 @@ hash_kv:	expr ':' expr
 			{
 				$$ = &HashKV{$1, nil}
 			}
-			
+
 type_name:	IDENTIFIER
 		|	INTERFACE
 %%
@@ -293,14 +328,15 @@ var simpleTokens = []simpleToken{
 	simpleToken{"/*array*/", HINTARRAY},
 	simpleToken{"/*slice*/", HINTARRAY},
 	simpleToken{"/*map*/", HINTMAP},
+	simpleToken{"<???>", UNKNOWN},
 }
 
 var reTokens = []reToken{
 	reToken{`^(?:\")(?:[^\\\"]*(?:\\.[^\\\"]*)*)(?:\")`, STRING},
-	reToken{`^0x[0-9a-f]+`, PTR},	
-	reToken{`^-?\d+(?:[.,]\d+)?`, NUMBER},	
+	reToken{`^0x[0-9a-f]+`, PTR},
+	reToken{`^-?\d+(?:[.,]\d+)?`, NUMBER},
 	reToken{`^interface\s*\{\}`, INTERFACE},
-	reToken{`^[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
+	reToken{`^\*?[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
 }
 
 var compiledReTokens = getCompiledReTokens()
@@ -324,7 +360,11 @@ func strPtr(s string) *string { return &s }
 func (x *exprLex) Lex(yylval *yySymType) int {
 	for {
 		if yyDebug >= 1 {
-			__yyfmt__.Printf("Lex: %s\n", x.line)
+			l := len(x.line)
+			if l > 100  {
+				l = 100
+			}
+			__yyfmt__.Printf("Lex: %s\n", x.line[:l])
 		}
 		if len(x.line) == 0 {
 			return 0

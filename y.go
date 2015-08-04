@@ -32,6 +32,7 @@ const MAP = 57353
 const INVALID = 57354
 const INTERFACE = 57355
 const IDENTIFIER = 57356
+const UNKNOWN = 57357
 
 var yyToknames = []string{
 	"STRING",
@@ -45,6 +46,7 @@ var yyToknames = []string{
 	"INVALID",
 	"INTERFACE",
 	"IDENTIFIER",
+	"UNKNOWN",
 }
 var yyStatenames = []string{}
 
@@ -52,7 +54,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyMaxDepth = 200
 
-//line dumper.y:263
+//line dumper.y:298
 
 type exprLex struct {
 	line   []byte
@@ -85,6 +87,7 @@ var simpleTokens = []simpleToken{
 	simpleToken{"/*array*/", HINTARRAY},
 	simpleToken{"/*slice*/", HINTARRAY},
 	simpleToken{"/*map*/", HINTMAP},
+	simpleToken{"<???>", UNKNOWN},
 }
 
 var reTokens = []reToken{
@@ -92,7 +95,7 @@ var reTokens = []reToken{
 	reToken{`^0x[0-9a-f]+`, PTR},
 	reToken{`^-?\d+(?:[.,]\d+)?`, NUMBER},
 	reToken{`^interface\s*\{\}`, INTERFACE},
-	reToken{`^[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
+	reToken{`^\*?[a-zA-Z_][a-zA-Z0-9\._]+`, IDENTIFIER},
 }
 
 var compiledReTokens = getCompiledReTokens()
@@ -116,7 +119,11 @@ func strPtr(s string) *string { return &s }
 func (x *exprLex) Lex(yylval *yySymType) int {
 	for {
 		if yyDebug >= 1 {
-			__yyfmt__.Printf("Lex: %s\n", x.line)
+			l := len(x.line)
+			if l > 100 {
+				l = 100
+			}
+			__yyfmt__.Printf("Lex: %s\n", x.line[:l])
 		}
 		if len(x.line) == 0 {
 			return 0
@@ -174,118 +181,128 @@ var yyExca = []int{
 	-2, 0,
 }
 
-const yyNprod = 43
+const yyNprod = 49
 const yyPrivate = 57344
 
 var yyTokenNames []string
 var yyStates []string
 
-const yyLast = 143
+const yyLast = 183
 
 var yyAct = []int{
 
-	67, 2, 68, 69, 66, 43, 42, 8, 37, 101,
-	79, 12, 9, 14, 11, 17, 15, 71, 54, 32,
-	45, 82, 10, 12, 9, 14, 11, 24, 15, 36,
-	28, 89, 13, 46, 10, 105, 50, 33, 53, 52,
-	16, 55, 63, 102, 58, 25, 12, 9, 14, 11,
-	70, 15, 91, 64, 88, 38, 83, 10, 70, 111,
-	78, 77, 75, 30, 81, 31, 76, 22, 80, 23,
-	84, 21, 18, 14, 20, 65, 15, 57, 88, 90,
-	85, 92, 19, 110, 73, 108, 98, 95, 96, 70,
-	100, 56, 99, 85, 85, 85, 103, 88, 106, 104,
-	97, 72, 94, 70, 85, 107, 70, 88, 109, 93,
-	85, 62, 87, 62, 29, 86, 74, 60, 61, 49,
-	48, 39, 40, 59, 14, 47, 44, 41, 39, 40,
-	34, 35, 51, 15, 41, 26, 27, 6, 5, 4,
+	71, 2, 72, 8, 73, 44, 43, 118, 70, 32,
+	37, 17, 111, 113, 12, 9, 14, 11, 84, 87,
+	15, 12, 9, 14, 11, 81, 10, 15, 33, 47,
+	24, 75, 52, 10, 132, 69, 56, 57, 55, 46,
+	61, 54, 12, 9, 14, 11, 14, 49, 15, 25,
+	67, 36, 74, 28, 10, 129, 104, 94, 95, 66,
+	79, 74, 136, 83, 14, 49, 117, 86, 82, 116,
+	94, 85, 112, 90, 97, 135, 30, 89, 31, 96,
+	107, 21, 18, 14, 20, 100, 13, 15, 103, 99,
+	14, 49, 108, 19, 16, 74, 110, 105, 94, 109,
+	58, 14, 49, 131, 22, 91, 23, 114, 29, 38,
+	130, 48, 98, 74, 94, 121, 120, 122, 74, 128,
+	125, 91, 126, 91, 91, 124, 127, 45, 123, 119,
+	74, 91, 133, 74, 91, 134, 115, 94, 91, 106,
+	94, 91, 102, 101, 65, 93, 92, 65, 77, 78,
+	39, 40, 64, 88, 80, 68, 41, 60, 59, 51,
+	50, 42, 76, 15, 63, 53, 62, 39, 40, 14,
+	49, 34, 35, 41, 26, 27, 6, 5, 42, 4,
 	3, 1, 7,
 }
 var yyPact = []int{
 
-	35, -1000, -1000, -1000, -1000, -1000, -1000, 60, 50, -1000,
-	22, 128, 8, -1000, -1000, 97, -1000, 46, -1000, 14,
-	123, 7, 117, 112, -3, 111, 101, 100, 111, 126,
-	124, 112, -5, 111, 72, 58, 111, 105, 99, -1000,
-	-1000, -1000, 98, -1000, 21, 111, 56, -1000, 35, 35,
-	-6, 83, 66, 96, 111, 47, 35, 35, -13, -1000,
-	-1000, -1000, 112, 12, 37, 35, 95, -1000, 92, -1000,
-	10, 111, -1000, -1000, -1000, 33, 35, 89, 82, 111,
-	-1000, -1000, -1000, 35, 80, 35, -1000, -1000, 35, 0,
-	24, 35, 79, -1000, -1000, 16, 78, -1000, -1000, -1000,
-	-1000, -1000, 35, 65, -1000, 35, -1000, 63, -1000, 39,
-	-1000, -1000,
+	31, -1000, -1000, -1000, -1000, -1000, -1000, 70, 86, -1000,
+	25, 167, 30, -1000, -1000, 90, -1000, 58, -1000, 4,
+	164, 28, 146, 113, 15, 88, 140, 139, 156, 159,
+	163, 113, 12, 77, 138, 137, 156, 147, 145, -1000,
+	-1000, -1000, -1000, 131, -1000, 37, 156, 135, 11, -1000,
+	31, 31, 7, 143, 129, 128, 156, 134, 1, 31,
+	31, -6, -1000, -1000, -1000, 113, 10, 133, 31, 156,
+	125, -1000, 124, -1000, 36, 51, -1000, -1000, -1000, 92,
+	31, 156, 122, 121, 33, -1000, -1000, -1000, 31, 118,
+	60, 31, -1000, -1000, 31, 3, 52, -11, 31, 115,
+	49, -1000, -1000, 46, -17, 108, -1000, 31, -1000, -1000,
+	-1000, -1000, 31, 156, 107, -1000, 31, 31, 156, -1000,
+	105, 98, 35, -1000, 89, 82, 14, -1000, -1000, 31,
+	-1000, -1000, 31, 54, 41, -1000, -1000,
 }
 var yyPgo = []int{
 
-	0, 32, 142, 8, 7, 141, 0, 140, 139, 138,
-	137, 4, 5, 6, 3, 2,
+	0, 86, 182, 10, 3, 181, 0, 180, 179, 177,
+	176, 8, 5, 6, 4, 2,
 }
 var yyR1 = []int{
 
-	0, 5, 6, 6, 6, 6, 11, 11, 1, 2,
-	2, 7, 7, 7, 7, 3, 3, 3, 8, 8,
-	8, 13, 13, 12, 12, 12, 9, 9, 9, 9,
-	9, 9, 10, 10, 10, 10, 15, 15, 15, 14,
-	14, 4, 4,
+	0, 5, 6, 6, 6, 6, 11, 11, 11, 1,
+	2, 2, 7, 7, 7, 7, 3, 3, 3, 3,
+	8, 8, 8, 13, 13, 12, 12, 12, 9, 9,
+	9, 9, 9, 9, 9, 9, 10, 10, 10, 10,
+	10, 10, 15, 15, 15, 14, 14, 4, 4,
 }
 var yyR2 = []int{
 
-	0, 1, 1, 1, 1, 1, 1, 3, 4, 1,
-	2, 5, 4, 2, 1, 1, 1, 1, 5, 4,
-	4, 1, 3, 0, 3, 3, 8, 7, 7, 6,
-	6, 5, 9, 8, 6, 5, 0, 1, 3, 3,
-	3, 1, 1,
+	0, 1, 1, 1, 1, 1, 0, 1, 3, 4,
+	1, 2, 5, 4, 2, 1, 1, 1, 1, 1,
+	5, 4, 4, 1, 3, 0, 3, 3, 8, 7,
+	7, 6, 9, 8, 6, 5, 9, 8, 11, 10,
+	6, 5, 0, 1, 3, 3, 3, 1, 1,
 }
 var yyChk = []int{
 
 	-1000, -5, -6, -7, -8, -9, -10, -2, -4, 12,
-	22, 14, 11, -1, 13, 16, -1, -4, 12, 22,
-	14, 11, 17, 19, 5, 23, 7, 8, 22, 17,
-	17, 19, 5, 23, 7, 8, 22, -3, -1, 4,
-	5, 10, -13, -12, 14, 23, -4, 14, 19, 19,
-	-4, 6, -3, -13, 23, -4, 19, 19, -4, 18,
-	18, 20, 15, 21, -4, 19, -11, -6, -15, -14,
-	-6, 23, 18, 18, 20, -4, 19, -11, -15, 23,
-	-12, -6, 9, 19, -11, 15, 20, 20, 15, 21,
-	-4, 19, -11, 20, 20, -4, -11, 20, -6, -14,
-	-6, 9, 19, -11, 20, 19, 20, -15, 20, -15,
-	20, 20,
+	23, 14, 11, -1, 13, 17, -1, -4, 12, 23,
+	14, 11, 18, 20, 5, 24, 7, 8, 23, 18,
+	18, 20, 5, 24, 7, 8, 23, -3, -1, 4,
+	5, 10, 15, -13, -12, 14, 24, -4, 23, 14,
+	20, 20, -4, 6, -3, -13, 24, -4, 23, 20,
+	20, -4, 19, 19, 21, 16, 22, -4, 20, 24,
+	-11, -6, -15, -14, -6, 24, 19, 19, 21, -4,
+	20, 24, -11, -15, 24, -12, -6, 9, 20, -11,
+	-4, 16, 21, 21, 16, 22, -4, 23, 20, -11,
+	-4, 21, 21, -4, 23, -11, 21, 20, -6, -14,
+	-6, 9, 20, 24, -11, 21, 20, 20, 24, 21,
+	-11, -15, -4, 21, -11, -15, -4, 21, 21, 20,
+	21, 21, 20, -15, -15, 21, 21,
 }
 var yyDef = []int{
 
-	0, -2, 1, 2, 3, 4, 5, 0, 0, 14,
-	0, 41, 0, 9, 42, 0, 10, 0, 13, 0,
-	41, 0, 0, 23, 0, 0, 0, 0, 0, 0,
-	0, 23, 0, 0, 0, 0, 0, 0, 0, 15,
-	16, 17, 0, 21, 0, 0, 0, 41, 0, 36,
-	0, 0, 0, 0, 0, 0, 0, 36, 0, 12,
-	20, 19, 23, 0, 0, 0, 0, 6, 0, 37,
-	0, 0, 8, 11, 18, 0, 0, 0, 0, 0,
-	22, 24, 25, 0, 0, 0, 31, 35, 0, 0,
-	0, 0, 0, 30, 34, 0, 0, 29, 7, 38,
-	39, 40, 36, 0, 28, 36, 27, 0, 26, 0,
-	33, 32,
+	0, -2, 1, 2, 3, 4, 5, 0, 0, 15,
+	0, 47, 0, 10, 48, 0, 11, 0, 14, 0,
+	47, 0, 0, 25, 0, 0, 0, 0, 0, 0,
+	0, 25, 0, 0, 0, 0, 0, 0, 0, 16,
+	17, 18, 19, 0, 23, 0, 0, 0, 0, 47,
+	6, 42, 0, 0, 0, 0, 0, 0, 0, 6,
+	42, 0, 13, 22, 21, 25, 0, 0, 6, 0,
+	0, 7, 0, 43, 0, 0, 9, 12, 20, 0,
+	6, 0, 0, 0, 0, 24, 26, 27, 6, 0,
+	0, 0, 35, 41, 0, 0, 0, 0, 6, 0,
+	0, 34, 40, 0, 0, 0, 31, 6, 8, 44,
+	45, 46, 42, 0, 0, 30, 6, 42, 0, 29,
+	0, 0, 0, 28, 0, 0, 0, 33, 37, 42,
+	32, 36, 42, 0, 0, 39, 38,
 }
 var yyTok1 = []int{
 
 	1, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 16, 3,
-	17, 18, 3, 3, 15, 3, 3, 3, 3, 3,
-	3, 3, 3, 3, 3, 3, 3, 3, 21, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 17, 3,
+	18, 19, 3, 3, 16, 3, 3, 3, 3, 3,
+	3, 3, 3, 3, 3, 3, 3, 3, 22, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 22, 3, 23, 3, 3, 3, 3, 3, 3,
+	3, 23, 3, 24, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
 	3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-	3, 3, 3, 19, 3, 20,
+	3, 3, 3, 20, 3, 21,
 }
 var yyTok2 = []int{
 
 	2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-	12, 13, 14,
+	12, 13, 14, 15,
 }
 var yyTok3 = []int{
 	0,
@@ -517,7 +534,7 @@ yydefault:
 	switch yynt {
 
 	case 1:
-		//line dumper.y:46
+		//line dumper.y:47
 		{
 			yylex.(*exprLex).result = yyVAL.node
 		}
@@ -530,7 +547,12 @@ yydefault:
 	case 5:
 		yyVAL.node = yyS[yypt-0].node
 	case 6:
-		//line dumper.y:56
+		//line dumper.y:57
+		{
+			yyVAL.node_list = nil
+		}
+	case 7:
+		//line dumper.y:61
 		{
 			if yyS[yypt-0].node == nil {
 				yyVAL.node_list = nil
@@ -538,25 +560,25 @@ yydefault:
 				yyVAL.node_list = []*BeautifyNode{yyS[yypt-0].node}
 			}
 		}
-	case 7:
-		//line dumper.y:64
-		{
-			yyVAL.node_list = append(yyS[yypt-2].node_list, yyS[yypt-0].node)
-		}
 	case 8:
 		//line dumper.y:69
 		{
-			yyVAL.string = yyS[yypt-1].string
+			yyVAL.node_list = append(yyS[yypt-2].node_list, yyS[yypt-0].node)
 		}
 	case 9:
-		yyVAL.string = yyS[yypt-0].string
+		//line dumper.y:74
+		{
+			yyVAL.string = yyS[yypt-1].string
+		}
 	case 10:
-		//line dumper.y:75
+		yyVAL.string = yyS[yypt-0].string
+	case 11:
+		//line dumper.y:80
 		{
 			yyVAL.string = yyS[yypt-1].string + "," + yyS[yypt-0].string
 		}
-	case 11:
-		//line dumper.y:80
+	case 12:
+		//line dumper.y:85
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:   strPtr(yyS[yypt-4].string),
@@ -564,37 +586,39 @@ yydefault:
 				Value: strPtr(yyS[yypt-1].string),
 			}
 		}
-	case 12:
-		//line dumper.y:88
+	case 13:
+		//line dumper.y:93
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:  yyS[yypt-3].string,
 				Value: strPtr(yyS[yypt-1].string),
 			}
 		}
-	case 13:
-		//line dumper.y:95
+	case 14:
+		//line dumper.y:100
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:  strPtr(yyS[yypt-1].string),
 				Type: yyS[yypt-0].string,
 			}
 		}
-	case 14:
-		//line dumper.y:102
+	case 15:
+		//line dumper.y:107
 		{
 			yyVAL.node = &BeautifyNode{
 				Type: yyS[yypt-0].string,
 			}
 		}
-	case 15:
-		yyVAL.string = yyS[yypt-0].string
 	case 16:
 		yyVAL.string = yyS[yypt-0].string
 	case 17:
 		yyVAL.string = yyS[yypt-0].string
 	case 18:
-		//line dumper.y:113
+		yyVAL.string = yyS[yypt-0].string
+	case 19:
+		yyVAL.string = yyS[yypt-0].string
+	case 20:
+		//line dumper.y:119
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:          strPtr(yyS[yypt-4].string),
@@ -602,24 +626,24 @@ yydefault:
 				StructValues: yyS[yypt-1].structKVs,
 			}
 		}
-	case 19:
-		//line dumper.y:121
+	case 21:
+		//line dumper.y:127
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:         yyS[yypt-3].string,
 				StructValues: yyS[yypt-1].structKVs,
 			}
 		}
-	case 20:
-		//line dumper.y:128
+	case 22:
+		//line dumper.y:134
 		{
 			yyVAL.node = &BeautifyNode{
 				Type: yyS[yypt-3].string,
 				Ptr:  strPtr(yyS[yypt-1].string),
 			}
 		}
-	case 21:
-		//line dumper.y:136
+	case 23:
+		//line dumper.y:142
 		{
 			if yyS[yypt-0].structKV == nil {
 				yyVAL.structKVs = nil
@@ -627,28 +651,28 @@ yydefault:
 				yyVAL.structKVs = []*StructKV{yyS[yypt-0].structKV}
 			}
 		}
-	case 22:
-		//line dumper.y:144
+	case 24:
+		//line dumper.y:150
 		{
 			yyVAL.structKVs = append(yyS[yypt-2].structKVs, yyS[yypt-0].structKV)
 		}
-	case 23:
-		//line dumper.y:150
+	case 25:
+		//line dumper.y:156
 		{
 			yyVAL.structKV = nil
 		}
-	case 24:
-		//line dumper.y:154
+	case 26:
+		//line dumper.y:160
 		{
 			yyVAL.structKV = &StructKV{yyS[yypt-2].string, yyS[yypt-0].node}
 		}
-	case 25:
-		//line dumper.y:158
+	case 27:
+		//line dumper.y:164
 		{
 			yyVAL.structKV = &StructKV{yyS[yypt-2].string, nil}
 		}
-	case 26:
-		//line dumper.y:163
+	case 28:
+		//line dumper.y:169
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:         strPtr(yyS[yypt-7].string),
@@ -656,16 +680,16 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 27:
-		//line dumper.y:171
+	case 29:
+		//line dumper.y:177
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:        "[" + yyS[yypt-5].string + "]" + yyS[yypt-3].string,
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 28:
-		//line dumper.y:178
+	case 30:
+		//line dumper.y:184
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:         strPtr(yyS[yypt-6].string),
@@ -673,16 +697,33 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 29:
-		//line dumper.y:186
+	case 31:
+		//line dumper.y:192
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:        "[]" + yyS[yypt-3].string,
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 30:
-		//line dumper.y:193
+	case 32:
+		//line dumper.y:199
+		{
+			yyVAL.node = &BeautifyNode{
+				Ptr:         strPtr(yyS[yypt-8].string),
+				Type:        "[]" + yyS[yypt-3].string,
+				ArrayValues: yyS[yypt-1].node_list,
+			}
+		}
+	case 33:
+		//line dumper.y:207
+		{
+			yyVAL.node = &BeautifyNode{
+				Type:        "[]" + yyS[yypt-3].string,
+				ArrayValues: yyS[yypt-1].node_list,
+			}
+		}
+	case 34:
+		//line dumper.y:214
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:         strPtr(yyS[yypt-5].string),
@@ -690,16 +731,16 @@ yydefault:
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 31:
-		//line dumper.y:201
+	case 35:
+		//line dumper.y:222
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:        yyS[yypt-4].string,
 				ArrayValues: yyS[yypt-1].node_list,
 			}
 		}
-	case 32:
-		//line dumper.y:209
+	case 36:
+		//line dumper.y:230
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:        strPtr(yyS[yypt-8].string),
@@ -707,16 +748,32 @@ yydefault:
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 33:
-		//line dumper.y:217
+	case 37:
+		//line dumper.y:238
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:       "map[" + yyS[yypt-5].string + "]" + yyS[yypt-3].string,
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 34:
-		//line dumper.y:224
+	case 38:
+		//line dumper.y:245
+		{
+			yyVAL.node = &BeautifyNode{
+				Type:       "map[" + yyS[yypt-7].string + "]" + yyS[yypt-3].string,
+				HashValues: yyS[yypt-1].hashKVs,
+			}
+		}
+	case 39:
+		//line dumper.y:252
+		{
+			yyVAL.node = &BeautifyNode{
+				Type:       "map[" + yyS[yypt-7].string + "]" + yyS[yypt-3].string,
+				HashValues: yyS[yypt-1].hashKVs,
+			}
+		}
+	case 40:
+		//line dumper.y:259
 		{
 			yyVAL.node = &BeautifyNode{
 				Ptr:        strPtr(yyS[yypt-5].string),
@@ -724,42 +781,42 @@ yydefault:
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 35:
-		//line dumper.y:232
+	case 41:
+		//line dumper.y:267
 		{
 			yyVAL.node = &BeautifyNode{
 				Type:       yyS[yypt-4].string,
 				HashValues: yyS[yypt-1].hashKVs,
 			}
 		}
-	case 36:
-		//line dumper.y:240
+	case 42:
+		//line dumper.y:275
 		{
 			yyVAL.hashKVs = nil
 		}
-	case 37:
-		//line dumper.y:244
+	case 43:
+		//line dumper.y:279
 		{
 			yyVAL.hashKVs = []*HashKV{yyS[yypt-0].hashKV}
 		}
-	case 38:
-		//line dumper.y:248
+	case 44:
+		//line dumper.y:283
 		{
 			yyVAL.hashKVs = append(yyS[yypt-2].hashKVs, yyS[yypt-0].hashKV)
 		}
-	case 39:
-		//line dumper.y:253
+	case 45:
+		//line dumper.y:288
 		{
 			yyVAL.hashKV = &HashKV{yyS[yypt-2].node, yyS[yypt-0].node}
 		}
-	case 40:
-		//line dumper.y:257
+	case 46:
+		//line dumper.y:292
 		{
 			yyVAL.hashKV = &HashKV{yyS[yypt-2].node, nil}
 		}
-	case 41:
+	case 47:
 		yyVAL.string = yyS[yypt-0].string
-	case 42:
+	case 48:
 		yyVAL.string = yyS[yypt-0].string
 	}
 	goto yystack /* stack new state and value */
