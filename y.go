@@ -55,7 +55,6 @@ const yyErrCode = 2
 const yyMaxDepth = 200
 
 //line dumper.y:298
-
 type exprLex struct {
 	line   []byte
 	peek   rune
