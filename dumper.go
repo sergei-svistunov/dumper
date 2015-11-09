@@ -49,7 +49,7 @@ func (v reflectValues) Less(i, j int) bool {
 	return false
 }
 
-func (v reflectValues) Swap(i, j int)  {
+func (v reflectValues) Swap(i, j int) {
 	v[i], v[j] = v[j], v[i]
 }
 
